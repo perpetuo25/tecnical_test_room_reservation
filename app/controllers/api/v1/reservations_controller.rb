@@ -10,13 +10,14 @@ module Api
       end
 
       def create
-        record = Reservation.create!(reservation_params)
+        records = create_reservations
+        payload = records.many? ? records.map { |record| reservation_payload(record) } : reservation_payload(records.first)
 
-        render_resource(record, serializer: method(:reservation_payload), status: :created)
+        render json: { data: payload }, status: :created
       end
 
       def cancel
-        reservation.update!(cancelled_at: Time.current)
+        reservation.cancel!
 
         render_resource(reservation, serializer: method(:reservation_payload))
       end
@@ -37,6 +38,14 @@ module Api
           :recurring,
           :recurring_until
         )
+      end
+
+      def create_reservations
+        if reservation_params[:recurring].present?
+          Reservations::RecurringCreator.new(reservation_params).call
+        else
+          [ Reservation.create!(reservation_params) ]
+        end
       end
 
       def reservation_payload(resource)

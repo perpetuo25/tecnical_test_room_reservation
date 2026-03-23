@@ -18,6 +18,8 @@ RSpec.describe Reservations::RecurringCreator do
 
       expect(records.size).to eq(3)
       expect(Reservation.count).to eq(3)
+      expect(records.map(&:recurring).uniq).to eq([ "daily" ])
+      expect(records.map(&:recurring_until).uniq).to eq([ Date.new(2026, 2, 4) ])
       expect(records.map { |record| record.starts_at.to_date }).to eq(
         [ Date.new(2026, 2, 2), Date.new(2026, 2, 3), Date.new(2026, 2, 4) ]
       )

@@ -1,6 +1,7 @@
 class Reservation < ApplicationRecord
   belongs_to :room
   belongs_to :user
+  attr_accessor :first_occurrence_starts_at
 
   BUSINESS_START_HOUR = 9
   BUSINESS_END_HOUR = 18
@@ -103,7 +104,8 @@ class Reservation < ApplicationRecord
 
   def recurring_until_after_first_occurrence
     return if recurring.blank? || recurring_until.blank? || starts_at.blank?
-    return if recurring_until > starts_at.to_date
+    first_occurrence_date = (first_occurrence_starts_at || starts_at).to_date
+    return if recurring_until > first_occurrence_date
 
     errors.add(:recurring_until, "must be after the first occurrence")
   end

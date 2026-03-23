@@ -30,16 +30,17 @@ module Reservations
       first_reservation.validate!
 
       step = STEP_BY_RECURRING.fetch(attributes[:recurring])
-      persisted_attributes = attributes.except(:recurring, :recurring_until)
+      first_occurrence_starts_at = first_reservation.starts_at
       starts_at = first_reservation.starts_at
       ends_at = first_reservation.ends_at
       recurring_until = first_reservation.recurring_until
       reservations = []
 
       while starts_at.to_date <= recurring_until
-        reservations << persisted_attributes.merge(
+        reservations << attributes.merge(
           starts_at: starts_at,
-          ends_at: ends_at
+          ends_at: ends_at,
+          first_occurrence_starts_at: first_occurrence_starts_at
         )
 
         starts_at += step

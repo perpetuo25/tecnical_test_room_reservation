@@ -1,15 +1,9 @@
 require "rails_helper"
 
 RSpec.describe "Api::V1::Reservations", type: :request do
-  describe "PATCH /api/v1/reservations/:id/cancel" do
-    it "marks the reservation as cancelled" do
-      starts_at = Time.zone.now.next_occurring(:monday).change(hour: 12, min: 0)
-      reservation = create(
-        :reservation,
-        cancelled_at: nil,
-        starts_at: starts_at,
-        ends_at: starts_at + 1.hour
-      )
+  describe "GET /api/v1/reservations" do
+    it "returns a paginated list of reservations" do
+      create_list(:reservation, 3)
 
       get "/api/v1/reservations", params: { page: 1, per_page: 2 }
 
@@ -35,6 +29,24 @@ RSpec.describe "Api::V1::Reservations", type: :request do
       expect(response.parsed_body.dig("data", "room", "id")).to eq(reservation.room_id)
       expect(response.parsed_body.dig("data", "user", "id")).to eq(reservation.user_id)
     end
+  end
+
+  describe "PATCH /api/v1/reservations/:id/cancel" do
+    it "marks the reservation as cancelled" do
+      starts_at = Time.zone.now.next_occurring(:monday).change(hour: 12, min: 0)
+      reservation = create(
+        :reservation,
+        cancelled_at: nil,
+        starts_at: starts_at,
+        ends_at: starts_at + 1.hour
+      )
+
+      patch "/api/v1/reservations/#{reservation.id}/cancel"
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body.dig("data", "cancelled_at")).to be_present
+      expect(reservation.reload.cancelled_at).to be_present
+    end
 
     it "returns validation errors when already cancelled" do
       starts_at = Time.zone.now.next_occurring(:monday).change(hour: 12, min: 0)
@@ -59,6 +71,23 @@ RSpec.describe "Api::V1::Reservations", type: :request do
   end
 
   describe "POST /api/v1/reservations" do
+    it "creates a reservation within the regular user's capacity" do
+      room = create(:room, capacity: 8)
+      user = create(:user, max_capacity_allowed: 8)
+
+      post "/api/v1/reservations", params: {
+        reservation: {
+          room_id: room.id,
+          user_id: user.id,
+          title: "Planning",
+          starts_at: 1.day.from_now.change(hour: 10),
+          ends_at: 1.day.from_now.change(hour: 11)
+        }
+      }
+
+      expect(response).to have_http_status(:created)
+    end
+
     it "creates all daily recurring occurrences" do
       room = create(:room)
       user = create(:user)
@@ -152,17 +181,8 @@ RSpec.describe "Api::V1::Reservations", type: :request do
     it "returns a bad request error when the payload root is missing" do
       post "/api/v1/reservations", params: {}
 
-      post "/api/v1/reservations", params: {
-        reservation: {
-          room_id: room.id,
-          user_id: user.id,
-          title: "Planning",
-          starts_at: 1.day.from_now.change(hour: 10),
-          ends_at: 1.day.from_now.change(hour: 11)
-        }
-      }
-
-      expect(response).to have_http_status(:created)
+      expect(response).to have_http_status(:bad_request)
+      expect(response.parsed_body["error"]["message"]).to include("param is missing")
     end
 
     it "rejects a room above the regular user's capacity limit" do
@@ -186,7 +206,17 @@ RSpec.describe "Api::V1::Reservations", type: :request do
     it "rejects a fourth active future reservation for a regular user" do
       user = create(:user)
       room = create(:room, capacity: user.max_capacity_allowed)
-      create_list(:reservation, 3, user: user, room: room)
+      base_date = Time.zone.now.next_occurring(:monday)
+
+      3.times do |index|
+        create(
+          :reservation,
+          user: user,
+          room: room,
+          starts_at: base_date.change(hour: 10 + index),
+          ends_at: base_date.change(hour: 11 + index)
+        )
+      end
 
       other_room = create(:room, capacity: user.max_capacity_allowed)
 
@@ -206,7 +236,19 @@ RSpec.describe "Api::V1::Reservations", type: :request do
 
     it "allows admins to bypass both reservation restrictions" do
       admin = create(:user, :admin, max_capacity_allowed: 1)
-      create_list(:reservation, 4, user: admin, room: create(:room, capacity: 20))
+      room = create(:room, capacity: 20)
+      base_date = Time.zone.now.next_occurring(:monday)
+
+      4.times do |index|
+        create(
+          :reservation,
+          user: admin,
+          room: room,
+          starts_at: base_date.change(hour: 10 + index),
+          ends_at: base_date.change(hour: 11 + index)
+        )
+      end
+
       room = create(:room, capacity: 30)
 
       post "/api/v1/reservations", params: {

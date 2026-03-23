@@ -174,14 +174,18 @@ RSpec.describe Reservation, type: :model do
 
     it "ignores past reservations for the limit" do
       user = create(:user)
+      room = create(:room, capacity: user.max_capacity_allowed)
+      past_date = Time.zone.now.prev_occurring(:friday)
 
-      create_list(
-        :reservation,
-        3,
-        user: user,
-        starts_at: 2.days.ago.change(hour: 10),
-        ends_at: 2.days.ago.change(hour: 11)
-      )
+      3.times do |index|
+        create(
+          :reservation,
+          user: user,
+          room: room,
+          starts_at: past_date.change(hour: 10 + index),
+          ends_at: past_date.change(hour: 11 + index)
+        )
+      end
 
       reservation = build(:reservation, user: user)
 
@@ -196,6 +200,9 @@ RSpec.describe Reservation, type: :model do
       reservation = build(:reservation, user: user)
 
       expect(reservation).to be_valid
+    end
+  end
+
   describe "#cancel!" do
     it "does not allow cancelling an already cancelled reservation" do
       starts_at = Time.zone.now.next_occurring(:monday).change(hour: 12, min: 0)

@@ -35,8 +35,7 @@ module Api
           :starts_at,
           :ends_at,
           :recurring,
-          :recurring_until,
-          :cancelled_at
+          :recurring_until
         )
       end
 

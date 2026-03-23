@@ -8,6 +8,7 @@ module Api
       rescue_from ActiveRecord::RecordNotFound, with: :render_not_found
       rescue_from ActiveRecord::RecordInvalid, with: :render_unprocessable_entity
       rescue_from ActionController::ParameterMissing, with: :render_bad_request
+      rescue_from StandardError, with: :render_internal_server_error if Rails.env.production?
 
       private
 
@@ -68,6 +69,14 @@ module Api
 
       def render_bad_request(exception)
         render_error(exception.message, status: :bad_request)
+      end
+
+      def render_forbidden(message = "Forbidden")
+        render_error(message, status: :forbidden)
+      end
+
+      def render_internal_server_error(_exception)
+        render_error("Internal server error", status: :internal_server_error)
       end
     end
   end
